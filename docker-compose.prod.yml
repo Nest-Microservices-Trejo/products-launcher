@@ -1,0 +1,145 @@
+services:
+  nats-server:
+    image: nats:latest
+  #   ports:
+  #     - "8222:8222"
+
+  client-gateway:
+    build:
+      context: ./client-gateway
+      dockerfile: dockerfile.prod
+    image: northamerica-northeast1-docker.pkg.dev/shop-microservices-475019/image-registry/client-gateway
+    ports:
+      - "${CLIENT_GATEWAY_PORT}:${CLIENT_GATEWAY_PORT}"
+      # No es necesario el volumen, para la construccion de la aplicación ya que no necesitamos nada del contenido de src para la construcción
+      # volumes:
+      #   - ./client-gateway/src:/usr/src/app/src
+      # El comando para levantar el proyecto, seria necesario de no haberlo definirlo dentro de nuestro dockerfile.prod, en este caso, se encuentra definido.
+      # Ademas, lo recomendable seria levantar el main.js de la carpeta dist, no nest, que es el caso del comando posterior, por lo que deberiamos usar node dist/main.js para levantar prod
+      #command: pnpm run start:dev
+    environment:
+      - NATS_SERVERS=${NATS_SERVERS}
+      - PORT=${CLIENT_GATEWAY_PORT}
+
+  auth-ms:
+    build:
+      context: ./auth-ms
+      dockerfile: dockerfile.prod
+    image:
+      northamerica-northeast1-docker.pkg.dev/shop-microservices-475019/image-registry/auth-ms
+      # No es necesario el puerto, para la construccion de la aplicación
+    # ports:
+    #   - "${CLIENT_GATEWAY_PORT}:${CLIENT_GATEWAY_PORT}"
+    # No es necesario el volumen, para la construccion de la aplicación ya que no necesitamos nada del contenido de src para la construcción
+    # volumes:
+    #   - ./client-gateway/src:/usr/src/app/src
+    # El comando para levantar el proyecto, seria necesario de no haberlo definirlo dentro de nuestro dockerfile.prod, en este caso, se encuentra definido.
+    # Ademas, lo recomendable seria levantar el main.js de la carpeta dist, no nest, que es el caso del comando posterior, por lo que deberiamos usar node dist/main.js para levantar prod
+    #command: pnpm run start:dev
+    environment:
+      - NATS_SERVERS=${NATS_SERVERS}
+      - DATABASE_URL=mongodb+srv://josers771:BfP9A9gwl1xj0IDc@cluster0.mbh8r2f.mongodb.net/AuthDB
+      - JWT_SECRET=${JWT_SECRET}
+
+  payments-ms:
+    build:
+      context: ./payments-ms
+      dockerfile: dockerfile.prod
+    image: northamerica-northeast1-docker.pkg.dev/shop-microservices-475019/image-registry/payments-ms
+    ports:
+      - 3003:3003
+    environment:
+      - NATS_SERVERS=${NATS_SERVERS}
+      - PORT=3003
+      - STRIPE_SECRET=${STRIPE_SECRET}
+      - STRIPE_SUCCESS_URL=${STRIPE_SUCCESS_URL}
+      - STRIPE_CANCEL_URL=${STRIPE_CANCEL_URL}
+      - STRIPE_ENDPOINT_SECRET=${STRIPE_ENDPOINT_SECRET}
+
+  orders-ms:
+    build:
+      context: ./orders-ms
+      dockerfile: dockerfile.prod
+      args:
+        - ORDERS_DATABASE_URL=${ORDERS_DATABASE_URL}
+    image: northamerica-northeast1-docker.pkg.dev/shop-microservices-475019/image-registry/orders-ms
+    environment:
+      - NATS_SERVERS=${NATS_SERVERS}
+      - PORT=3003
+      - DATABASE_URL=${ORDERS_DATABASE_URL}
+
+  products-ms:
+    build:
+      context: ./products-ms
+      dockerfile: dockerfile.prod
+      args:
+        - PRODUCTS_DATABASE_URL=file:/usr/src/app/prisma/dev.db
+    image: northamerica-northeast1-docker.pkg.dev/shop-microservices-475019/image-registry/products-ms
+
+    environment:
+      - NATS_SERVERS=${NATS_SERVERS}
+      - DATABASE_URL=file:/usr/src/app/prisma/dev.db
+      - PORT=3002
+      - JWT_SECRET=${JWT_SECRET}
+
+  # auth-ms:
+  #   build: ./auth-ms
+  #   volumes:
+  #     - ./auth-ms/src:/usr/src/app/src
+  #   command: pnpm run start:dev
+  #   environment:
+  #     - NATS_SERVERS=nats://nats-server:4222
+  #     - DATABASE_URL=mongodb+srv://josers771:BfP9A9gwl1xj0IDc@cluster0.mbh8r2f.mongodb.net/AuthDB
+  #     - JWT_SECRET=EstaEsmiClaveSecretaSupersecreta1234zjajajjajajajasXD
+
+  # product-ms:
+  #   build: ./products-ms
+  #   volumes:
+  #     - ./products-ms/src:/usr/src/app/src
+  #   command: pnpm run start:dev
+  #   environment:
+  #     - NATS_SERVERS=nats://nats-server:4222
+  #     - PORT=3001
+  #     - DATABASE_URL=file:./dev.db
+
+  # # Orders MS
+  # orders-ms:
+  #   depends_on:
+  #     - orders-db
+  #   build: ./orders-ms
+  #   volumes:
+  #     - ./orders-ms/src:/usr/src/app/src
+  #   command: pnpm run start:dev
+  #   environment:
+  #     - NATS_SERVERS=nats://nats-server:4222
+  #     - PORT=3002
+  #     - DATABASE_URL=postgresql://postgres:123456@orders-db:5432/ordersdb?schema=public
+
+  # # Orders DB
+  # orders-db:
+  #   container_name: orders_database
+  #   image: postgres:16.2
+  #   restart: always
+  #   volumes:
+  #     - ./orders-ms/postgres:/var/lib/postgresql/data
+  #   ports:
+  #     - 5432:5432
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=123456
+  #     - POSTGRES_DB=ordersdb
+
+  # payments-ms:
+  #   build: ./payments-ms
+  #   volumes:
+  #     - ./payments-ms/src:/usr/src/app/src
+  #   ports:
+  #     - "${PAYMENT_MS_PORT}:3003"
+  #   command: pnpm run start:dev
+  #   environment:
+  #     - NATS_SERVERS=nats://nats-server:4222
+  #     - PORT=3003
+  #     - STRIPE_SECRET=${STRIPE_SECRET}
+  #     - STRIPE_SUCCESS_URL=${STRIPE_SUCCESS_URL}
+  #     - STRIPE_CANCEL_URL=${STRIPE_CANCEL_URL}
+  #     - STRIPE_ENDPOINT_SECRET=${STRIPE_ENDPOINT_SECRET}
